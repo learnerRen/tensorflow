@@ -25,7 +25,7 @@ def model(a0,w1,b1,w2,b2,exp_weight_avg=None):
         exp_weight_avg.average we use this to average every value.
         when we define exp_weight_avg, 
         '''
-        return tf.matmul(a1,exp_weight_avg.average(w2)+exp_weight_avg.average(b2))
+        return tf.matmul(a1,exp_weight_avg.average(w2))+exp_weight_avg.average(b2)
     
 def train(mnist,moving_average_decay=0.99,learning_rate=0.1,training_steps=1000,batch_size=128,learning_rate_decay=0.99,regularization_rate=0.01):
     x=tf.placeholder(tf.float32,[None,input_node],name='x-input')
@@ -41,9 +41,8 @@ def train(mnist,moving_average_decay=0.99,learning_rate=0.1,training_steps=1000,
         variable_average_op=exp_weight_avg.apply(tf.trainable_variables())
         #variable_average_operation=exp_weight_avg.apply(tf.trainable_variables())
         #apply it on every trainable vraiabls. tf.trainable_variables() returns all trainable variables
-        y=model(x,w1,b1,w2,b2,exp_weight_avg=exp_weight_avg)
-    else:
-        y=model(x,w1,b1,w2,b2,exp_weight_avg=None)
+        average_y=model(x,w1,b1,w2,b2,exp_weight_avg=exp_weight_avg)
+    y=model(x,w1,b1,w2,b2,exp_weight_avg=None)
     cross_entropy=tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.argmax(y_,1),logits=y)
     cross_entropy_mean=tf.reduce_mean(cross_entropy)
     regularizer=tf.contrib.layers.l2_regularizer(regularization_rate)
@@ -61,6 +60,10 @@ def train(mnist,moving_average_decay=0.99,learning_rate=0.1,training_steps=1000,
     namely, decay faster and faster
     '''
     train_step=tf.train.GradientDescentOptimizer(learning_rate).minimize(loss,global_step=global_step)
+    if moving_average_decay:
+        train_op=tf.group(train_step,variable_average_op)
+    else:
+        train_op=train_step
     correct_prediction=tf.equal(tf.argmax(y,1),tf.argmax(y_,1))
     accuracy=tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
     
@@ -89,7 +92,7 @@ learning_rate=0.8
 learning_rate_decay=0.99
 regularization_rate=0.0001
 training_steps=10000
-moving_average_decay=0.99
+moving_average_decay=0.5
 
 print("with exponential_average_weight")
 train(mnist,
